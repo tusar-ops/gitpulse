@@ -124,7 +124,8 @@ class GitHubAnalyzer:
             created = datetime.fromisoformat(event["created_at"].replace("Z", "+00:00"))
             commit_count = len(event.get("payload", {}).get("commits", []))
 
-            commit_days[created.date().isoformat()] += commit_count
+            if commit_count > 0:
+                commit_days[created.date().isoformat()] += commit_count
 
             if created >= month_ago:
                 total_commits_month += commit_count
