@@ -95,48 +95,87 @@ class GitHubAnalyzer:
         }
 
     def _fetch_commit_stats(self):
-        # NOTE: GitHub's Events API (/events/public) only returns events from
-        # roughly the last 90 days (and caps out around 300 events total),
-        # regardless of how far back we set year_ago. So "last_365_days" here
-        # is really "last ~90 days, whatever the Events API gives us" — it
-        # will undercount activity older than that window. The display layer
-        # labels this accordingly instead of claiming a full year.
+        """Fetch public commits authored by this user from public, non-fork repos.
+
+        Unlike the Events API, the repository Commits API gives us actual commit
+        records and lets us query by author and date. This makes the 30/90/365-day
+        numbers much more meaningful for public repositories.
+        """
         now = datetime.now(timezone.utc)
         month_ago = now - timedelta(days=30)
+        ninety_days_ago = now - timedelta(days=90)
         year_ago = now - timedelta(days=365)
 
-        events = []
-        page = 1
-        while page <= 3:  # max 3 pages = 90 events
-            data = self._get(
-                f"{GITHUB_API}/users/{self.username}/events/public",
-                params={"per_page": 30, "page": page},
-            )
-            if not data:
-                break
-            events.extend(data)
-            if len(data) < 30:
-                break
-            page += 1
-            time.sleep(0.1)
-
-        push_events = [e for e in events if e.get("type") == "PushEvent"]
-
         commit_days = defaultdict(int)
+        seen_shas = set()
         total_commits_month = 0
+        total_commits_90 = 0
         total_commits_year = 0
 
-        for event in push_events:
-            created = datetime.fromisoformat(event["created_at"].replace("Z", "+00:00"))
-            commit_count = len(event.get("payload", {}).get("commits", []))
+        # Use public, non-fork repositories only. Forks can otherwise duplicate
+        # commits that already exist in the upstream repository.
+        public_repos = [r for r in self.repos if not r.get("fork")]
 
-            if commit_count > 0:
-                commit_days[created.date().isoformat()] += commit_count
+        for repo in public_repos:
+            owner = repo.get("owner", {}).get("login") or self.username
+            name = repo.get("name")
+            if not name:
+                continue
 
-            if created >= month_ago:
-                total_commits_month += commit_count
-            if created >= year_ago:
-                total_commits_year += commit_count
+            page = 1
+            while True:
+                data = self._get(
+                    f"{GITHUB_API}/repos/{owner}/{name}/commits",
+                    params={
+                        "author": self.username,
+                        "since": year_ago.isoformat(),
+                        "until": now.isoformat(),
+                        "per_page": 100,
+                        "page": page,
+                    },
+                )
+
+                if not data:
+                    break
+
+                for commit in data:
+                    sha = commit.get("sha")
+                    if not sha or sha in seen_shas:
+                        continue
+
+                    # Prefer the author timestamp because this measures when the
+                    # user authored the commit, not when it was pushed.
+                    commit_info = commit.get("commit", {})
+                    author_info = commit_info.get("author", {})
+                    date_str = author_info.get("date")
+                    if not date_str:
+                        continue
+
+                    try:
+                        created = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+                    except ValueError:
+                        continue
+
+                    if created < year_ago or created > now:
+                        continue
+
+                    seen_shas.add(sha)
+                    day = created.date().isoformat()
+                    commit_days[day] += 1
+                    total_commits_year += 1
+
+                    if created >= ninety_days_ago:
+                        total_commits_90 += 1
+                    if created >= month_ago:
+                        total_commits_month += 1
+
+                # If GitHub returned fewer than a full page, there is no next page.
+                if len(data) < 100:
+                    break
+                page += 1
+
+                # Small pause keeps the CLI friendly to GitHub's API.
+                time.sleep(0.05)
 
         active_days = len(commit_days)
         avg_per_active_day = (
@@ -145,6 +184,7 @@ class GitHubAnalyzer:
 
         self.commit_stats = {
             "last_30_days": total_commits_month,
+            "last_90_days": total_commits_90,
             "last_365_days": total_commits_year,
             "active_days": active_days,
             "avg_per_active_day": avg_per_active_day,

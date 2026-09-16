@@ -145,6 +145,7 @@ gitpulse/
 ## ⚠️ Known Limitations
 
 - **Commit activity reflects public repository activity only.** GitPulse requests read-only public access, so it cannot see commits made in your private repositories — even ones that show up on your own GitHub contribution graph. If your recent activity lives mostly in private repos, "Commit Activity" numbers will undercount it.
+- **Only direct pushes are counted, not PR merges.** GitPulse counts `PushEvent`s from the public Events API. Developers who work primarily via pull requests merged through the GitHub UI (squash/rebase merges) generate `PullRequestEvent`s instead, which aren't counted here — so highly active contributors on PR-based workflows may show 0 commits even with real activity.
 - **"Last ~90 days" is an approximation, not exactly 90 days.** It comes from GitHub's public Events API, which returns a rolling window of your most recent public events (roughly the last 90 days, capped at ~300 events) — not a fixed date range you can query directly.
 - These are limitations of GitHub's public API, not bugs — full private-repo access would require asking users to grant a broader OAuth token scope, which this tool intentionally avoids for privacy/security reasons.
 

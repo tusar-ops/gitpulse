@@ -71,10 +71,15 @@ def fetch_jobs(top_languages, location="India", role_hint=None, limit=10):
     }
 
     try:
-        response = requests.get(SERPAPI_ENDPOINT, params=params, timeout=15)
+        response = requests.get(SERPAPI_ENDPOINT, params=params, timeout=30)
         response.raise_for_status()
-    except requests.exceptions.RequestException as e:
-        raise JobsFetchError(f"SerpApi request failed: {e}")
+    except requests.exceptions.RequestException:
+        # one retry — helps with transient network blips
+        try:
+            response = requests.get(SERPAPI_ENDPOINT, params=params, timeout=30)
+            response.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            raise JobsFetchError(f"SerpApi request failed: {e}")
 
     data = response.json()
 
