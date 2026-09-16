@@ -202,3 +202,11 @@ class GitHubAnalyzer:
         raw = (stars * 4) + (forks * 3) + (followers * 2) + (repos * 1) + (commits * 0.5)
         # normalize to 0–100 scale (soft cap at 500 raw → 100)
         self.impact_score = min(round((raw / 500) * 100), 100)
+
+    def get_top_languages(self, limit: int = 3) -> list:
+        """
+        Returns the top detected languages as a plain list, e.g. ["Python", "JavaScript"].
+        self.languages is already sorted by usage (highest % first), so this
+        just takes the top `limit` keys. Used by jobs.py to build a job search query.
+        """
+        return list(self.languages.keys())[:limit]
