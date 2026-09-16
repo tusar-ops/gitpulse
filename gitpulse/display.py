@@ -140,7 +140,7 @@ class Display:
         self.console.print("[bold cyan]  Commit Activity[/]")
         self.console.print("  " + "─" * 48)
         self.console.print(f"  [white]Last 30 days:[/]  [bold yellow]{stats['last_30_days']}[/] commits")
-        self.console.print(f"  [white]Last 365 days:[/] [bold yellow]{stats['last_365_days']}[/] commits")
+        self.console.print(f"  [white]Last ~90 days[/] [dim](GitHub API limit)[/][white]:[/] [bold yellow]{stats['last_365_days']}[/] commits")
         self.console.print(f"  [white]Active days:[/]   [bold yellow]{stats['active_days']}[/] days")
         self.console.print(f"  [white]Avg per day:[/]   [bold yellow]{stats['avg_per_active_day']}[/] commits/active day\n")
 

@@ -95,6 +95,12 @@ class GitHubAnalyzer:
         }
 
     def _fetch_commit_stats(self):
+        # NOTE: GitHub's Events API (/events/public) only returns events from
+        # roughly the last 90 days (and caps out around 300 events total),
+        # regardless of how far back we set year_ago. So "last_365_days" here
+        # is really "last ~90 days, whatever the Events API gives us" — it
+        # will undercount activity older than that window. The display layer
+        # labels this accordingly instead of claiming a full year.
         now = datetime.now(timezone.utc)
         month_ago = now - timedelta(days=30)
         year_ago = now - timedelta(days=365)
